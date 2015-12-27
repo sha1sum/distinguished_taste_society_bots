@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/sha1sum/distinguished_taste_society_bots/matchers"
 	"github.com/sha1sum/golang_groupme_bot/bot"
-	"github.com/sha1sum/golang_groupme_bot/matchers"
 )
 
-// Searcher will satisfy the bot.Searcher interface.
+// Handler will satisfy the bot.Handler interface.
 type Handler struct{}
 
-// FirstLink takes a search term and queries Google News for results, then parses the first story's raw link from the
+// Handle takes a search term and queries Google News for results, then parses the first story's raw link from the
 // RSS output returned by Google News.
 func (handler Handler) Handle(term string, c chan []*bot.OutgoingMessage, message bot.IncomingMessage) {
 	// Fetch the Google news search results for the search term as an RSS feed.
@@ -50,8 +50,8 @@ func parseLink(item matchers.Item) []*bot.OutgoingMessage {
 	}
 	ls := queryVals["url"]
 	if len(ls) < 1 {
-		return []*bot.OutgoingMessage{&bot.OutgoingMessage{Message: item.Link}}
+		return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: item.Link}}
 	}
 	fmt.Println("Found link", ls[0])
-	return []*bot.OutgoingMessage{&bot.OutgoingMessage{Message: ls[0]}}
+	return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: ls[0]}}
 }
