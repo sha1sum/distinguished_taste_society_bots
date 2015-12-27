@@ -6,6 +6,8 @@ bots are built to use github.com/sha1sum/golang_groupme_bot.
 package main
 
 import (
+	"os"
+
 	"github.com/sha1sum/distinguished_taste_society_bots/handlers/adultpoints"
 	"github.com/sha1sum/distinguished_taste_society_bots/handlers/googlenews"
 	"github.com/sha1sum/golang_groupme_bot/bot"
@@ -23,6 +25,7 @@ func main() {
 			"! news",
 		},
 		Handler: new(googlenews.Handler),
+		BotID: os.Getenv("GROUPME_BOT_ID"),
 	}
 
 	// Adult Point tracking bot
@@ -38,6 +41,7 @@ func main() {
 			"! adults",
 		},
 		Handler: new(adultpoints.Handler),
+		BotID: os.Getenv("GROUPME_BOT_ID"),
 	}
 
 	commands = append(commands, news)
