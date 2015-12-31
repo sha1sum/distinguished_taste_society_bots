@@ -106,7 +106,7 @@ func pointProcess(term string, sess *mgo.Session, message bot.IncomingMessage) [
 // requestPoint handles users making the request for a point.
 func requestPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) []*bot.OutgoingMessage {
 	args := strings.Join(words, " ")
-	col := sess.DB(DB).C("groupmeUsersV3")
+	col := sess.DB(DB).C("groupmeUsersV4")
 	var cu user
 	fmt.Println(message.UserID)
 	err := col.Find(bson.M{"userID": message.UserID}).One(&cu)
@@ -114,15 +114,18 @@ func requestPoint(words []string, sess *mgo.Session, message bot.IncomingMessage
 		col.Insert(user{ID: bson.NewObjectId(), UserID: message.UserID, Name: message.Name, Points: 0, Created: time.Now()})
 	}
 	_ = col.Find(bson.M{"userID": message.UserID}).One(&cu)
-	requests := cu.Requests
 	reference := determineReference(cu, sess)
-	cu.Requests = append(requests, request{
+	req := request{
 		Reference:   reference,
 		RequestedOn: time.Now(),
 		Approved:    false,
 		Reason:      args,
+	}
+	col.Update(bson.M{"_id": cu.ID}, bson.M{
+		"$push":bson.M{
+			"requests":req,
+		},
 	})
-	col.Update(bson.M{"_id": cu.ID}, cu)
 	t := message.Name + " has requested an adult point \"" + args + "\"."
 	t += " To approve the point, just type \"!award " + reference + "\", or to reject it, use \"!reject " + reference + "\"."
 	return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: t}}
@@ -132,7 +135,7 @@ func requestPoint(words []string, sess *mgo.Session, message bot.IncomingMessage
 // point is being awarded or rejected
 func determineReference(cu user, sess *mgo.Session) string {
 	var results []user
-	_ = sess.DB(DB).C("groupmeUsersV3").Find(nil).Sort("created").All(&results)
+	_ = sess.DB(DB).C("groupmeUsersV4").Find(nil).Sort("created").All(&results)
 	ui := 0
 	for i, v := range results {
 		if v.UserID == cu.UserID {
@@ -140,16 +143,16 @@ func determineReference(cu user, sess *mgo.Session) string {
 			break
 		}
 	}
-	return strconv.Itoa(ui+1) + strconv.Itoa(len(cu.Requests)+1)
+	return strconv.Itoa(ui + 1) + strconv.Itoa(len(cu.Requests) + 1)
 }
 
 // awardPoint increases the number of approved point requests (as long as it's not a duplicate or an attempt to award
 // a point by the requester or a bot)
 func awardPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) []*bot.OutgoingMessage {
 	args := strings.Join(words, " ")
-	col := sess.DB(DB).C("groupmeUsersV3")
+	col := sess.DB(DB).C("groupmeUsersV4")
 	var cu user
-	err := col.Find(bson.M{"requests": bson.M{"$elemMatch": bson.M{"reference": args}}}).One(&cu)
+	err := col.Find(bson.M{"requests.reference":args}).One(&cu)
 	if err != nil {
 		return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: "Couldn't find a request with reference \"" + args + "\"."}}
 	}
@@ -164,8 +167,14 @@ func awardPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) 
 	if cu.UserID == message.UserID || message.SenderType == "bot" {
 		t := "Stop trying to be slick! You can't approve your own requests!"
 		t += " Just for that, I'm revoking the request!"
-		cu.Requests = append(requests[:ri], requests[ri+1:]...)
-		col.Update(bson.M{"_id": cu.ID}, cu)
+		col.Update(bson.M{"_id": cu.ID}, bson.M{
+			"$pull":bson.M{
+				"requests":bson.M{
+					"reference":args,
+				},
+			},
+		})
+		calcPoints(col, &cu)
 		return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: t}}
 	}
 	previous := [2]int{len(requests[ri].Approvals), len(requests[ri].Rejections)}
@@ -174,31 +183,45 @@ func awardPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) 
 			return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: "You've already approved that request (dumbass)."}}
 		}
 	}
-	for i, v := range requests[ri].Rejections {
-		if v.RejectedByID == message.UserID {
-			requests[ri].Rejections = append(requests[ri].Rejections[:i], requests[ri].Rejections[i+1:]...)
-			addApproval(col, message.UserID, &cu, ri)
-			return []*bot.OutgoingMessage{
-				&bot.OutgoingMessage{Text: "Your previous rejection has been switched to an approval (make up your damn mind)."},
-				announcePointChange(true, col, &cu, &requests[ri], previous, message),
-			}
+	var bcu user
+	err = col.Find(bson.M{
+		"_id":cu.ID,
+		"requests." + strconv.Itoa(ri) + ".rejections.rejectedByID":message.UserID,
+	}).One(&bcu)
+	if len(bcu.UserID) > 0 && err == nil {
+		col.Update(bson.M{"_id": cu.ID}, bson.M{
+			"$pull":bson.M{
+				"requests." + strconv.Itoa(ri) + ".rejections":bson.M{
+					"rejectedByID":message.UserID,
+				},
+			},
+		})
+		addApproval(col, message.UserID, &cu, ri)
+		return []*bot.OutgoingMessage{
+			&bot.OutgoingMessage{Text: "Your previous rejection has been switched to an approval (make up your damn mind)."},
+			announcePointChange(true, col, &cu, ri, previous, message),
 		}
 	}
 	addApproval(col, message.UserID, &cu, ri)
 	cu.Requests = requests
-	return []*bot.OutgoingMessage{announcePointChange(true, col, &cu, &requests[ri], previous, message)}
+	return []*bot.OutgoingMessage{announcePointChange(true, col, &cu, ri, previous, message)}
 }
 
 // addApproval actually adds the point award to the DB document
 func addApproval(col *mgo.Collection, approvedByID string, cu *user, ri int) {
-	cu.Requests[ri].Approvals = append(cu.Requests[ri].Approvals, approval{ApprovedByID: approvedByID, ApprovedOn: time.Now()})
-	col.Update(bson.M{"_id": cu.ID}, cu)
+	app := approval{ApprovedByID: approvedByID, ApprovedOn: time.Now()}
+	col.Update(bson.M{"_id": cu.ID}, bson.M{
+		"$push":bson.M{
+			"requests." + strconv.Itoa(ri) + ".approvals":app,
+		},
+	})
+	calcPoints(col, cu)
 }
 
 // rejectPoint handles rejecting a request for a point (as long as it's not a duplicate)
 func rejectPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) []*bot.OutgoingMessage {
 	args := strings.Join(words, " ")
-	col := sess.DB(DB).C("groupmeUsersV3")
+	col := sess.DB(DB).C("groupmeUsersV4")
 	var cu user
 	err := col.Find(bson.M{"requests": bson.M{"$elemMatch": bson.M{"reference": args}}}).One(&cu)
 	if err != nil {
@@ -218,7 +241,7 @@ func rejectPoint(words []string, sess *mgo.Session, message bot.IncomingMessage)
 		addRejection(col, message.UserID, &cu, ri)
 		return []*bot.OutgoingMessage{
 			&bot.OutgoingMessage{Text: t},
-			announcePointChange(false, col, &cu, &requests[ri], previous, message),
+			announcePointChange(false, col, &cu, ri, previous, message),
 		}
 	}
 	for _, v := range requests[ri].Rejections {
@@ -226,46 +249,70 @@ func rejectPoint(words []string, sess *mgo.Session, message bot.IncomingMessage)
 			return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: "You've already rejected that request (dumbass)."}}
 		}
 	}
-	for i, v := range requests[ri].Approvals {
-		if v.ApprovedByID == message.UserID {
-			requests[ri].Approvals = append(requests[ri].Approvals[:i], requests[ri].Approvals[i+1:]...)
-			addRejection(col, message.UserID, &cu, ri)
-			return []*bot.OutgoingMessage{
-				&bot.OutgoingMessage{Text: "Your previous approval has been switched to a rejection (make up your damn mind)."},
-				announcePointChange(false, col, &cu, &requests[ri], previous, message),
-			}
+	var bcu user
+	err = col.Find(bson.M{
+		"_id":cu.ID,
+		"requests." + strconv.Itoa(ri) + ".approvals.approvedByID":message.UserID,
+	}).One(&bcu)
+	fmt.Printf("bcu: %+v\n\n", bcu)
+	if len(bcu.UserID) > 0 && err == nil {
+		col.Update(bson.M{"_id": cu.ID}, bson.M{
+			"$pull":bson.M{
+				"requests." + strconv.Itoa(ri) + ".approvals":bson.M{
+					"approvedByID":message.UserID,
+				},
+			},
+		})
+		addRejection(col, message.UserID, &cu, ri)
+		return []*bot.OutgoingMessage{
+			&bot.OutgoingMessage{Text: "Your previous approval has been switched to a rejection (make up your damn mind)."},
+			announcePointChange(false, col, &cu, ri, previous, message),
 		}
 	}
 	addRejection(col, message.UserID, &cu, ri)
 	cu.Requests = requests
-	return []*bot.OutgoingMessage{announcePointChange(false, col, &cu, &requests[ri], previous, message)}
+	return []*bot.OutgoingMessage{announcePointChange(false, col, &cu, ri, previous, message)}
 }
 
 // addRejection adds the point rejection to the DB document
 func addRejection(col *mgo.Collection, rejectedByID string, cu *user, ri int) {
-	cu.Requests[ri].Rejections = append(cu.Requests[ri].Rejections, rejection{RejectedByID: rejectedByID, RejectedOn: time.Now()})
-	col.Update(bson.M{"_id": cu.ID}, cu)
+	rej := rejection{RejectedByID: rejectedByID, RejectedOn: time.Now()}
+	col.Update(bson.M{"_id": cu.ID}, bson.M{
+		"$push":bson.M{
+			"requests." + strconv.Itoa(ri) + ".rejections":rej,
+		},
+	})
+	calcPoints(col, cu)
+}
+
+// calcPoints calculates the points for a user and updates the point count
+func calcPoints(col *mgo.Collection, cu *user) {
+	points := 0
+	col.Find(bson.M{"_id":cu.ID}).One(cu)
+	for _, req := range cu.Requests {
+		if len(req.Approvals) <= len(req.Rejections) { continue }
+		points++
+	}
+	col.Update(bson.M{"_id":cu.ID}, bson.M{"$set": bson.M{"points":points}})
+	col.Find(bson.M{"userID":cu.UserID}).One(cu)
 }
 
 // announcePointChange sends a message to the group about the current state of the awards/rejects for the point request
 // depending on the balance of awards/rejections
-func announcePointChange(approving bool, col *mgo.Collection, cu *user, req *request, previous [2]int, message bot.IncomingMessage) *bot.OutgoingMessage {
+func announcePointChange(approving bool, col *mgo.Collection, cu *user, ri int, previous [2]int, message bot.IncomingMessage) *bot.OutgoingMessage {
+	col.Find(bson.M{"userID":cu.UserID}).One(cu)
 	pa := previous[0]
 	pr := previous[1]
+	req := cu.Requests[ri]
+	fmt.Printf("%+v\n", req)
 	switch {
 	case pa == 0 && pr == 0 && len(req.Approvals) == 1:
-		cu.Points++
-		col.Update(bson.M{"_id": cu.ID}, cu)
 		return &bot.OutgoingMessage{Text: cu.Name + ", you just got your first point \"" + req.Reason + "\" (for now)!"}
 	case pa == 0 && pr == 0 && len(req.Rejections) == 1:
 		return &bot.OutgoingMessage{Text: "DENIED, " + cu.Name + " :( -- " + message.Name + " doesn't seem to believe you deserve your point \"" + req.Reason + "\"."}
 	case pa <= pr && len(req.Approvals) > len(req.Rejections):
-		cu.Points++
-		col.Update(bson.M{"_id": cu.ID}, cu)
 		return &bot.OutgoingMessage{Text: message.Name + " believes in you, " + cu.Name + "! You just got your point \"" + req.Reason + "\"!"}
 	case pa > pr && len(req.Rejections) >= len(req.Approvals):
-		cu.Points--
-		col.Update(bson.M{"_id": cu.ID}, cu)
 		return &bot.OutgoingMessage{Text: message.Name + " thinks you should try harder, " + cu.Name + "! Your point just got revoked \"" + req.Reason + "\". :("}
 	case pr > pa && len(req.Rejections) == len(req.Approvals):
 		return &bot.OutgoingMessage{Text: "So close to gettin' that point, " + cu.Name + "! You just need one more approval \"" + req.Reason + "\"."}
@@ -282,7 +329,7 @@ func announcePointChange(approving bool, col *mgo.Collection, cu *user, req *req
 // listAdults outputs the current point leaderboard to the GroupMe group.
 func listAdults(sess *mgo.Session) []*bot.OutgoingMessage {
 	var results []user
-	_ = sess.DB(DB).C("groupmeUsersV3").Find(nil).Sort("-points").All(&results)
+	_ = sess.DB(DB).C("groupmeUsersV4").Find(nil).Sort("-points").All(&results)
 	board := ""
 	total := 0
 	for _, v := range results {
