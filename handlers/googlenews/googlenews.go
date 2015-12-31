@@ -18,6 +18,7 @@ type Handler struct{}
 // Handle takes a search term and queries Google News for results, then parses the first story's raw link from the
 // RSS output returned by Google News.
 func (handler Handler) Handle(term string, c chan []*bot.OutgoingMessage, message bot.IncomingMessage) {
+	if message.SenderType == "bot" { return }
 	// Fetch the Google news search results for the search term as an RSS feed.
 	doc, err := matchers.Retrieve("http://news.google.com/news?q=" + url.QueryEscape(term) + "&output=rss")
 	if err != nil {

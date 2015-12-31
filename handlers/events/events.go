@@ -27,6 +27,7 @@ type Handler struct {
 
 // Handle takes a search term and queries the Eventful API for matching results in the given ZIP code
 func (handler Handler) Handle(term string, c chan []*bot.OutgoingMessage, message bot.IncomingMessage) {
+	if message.SenderType == "bot" { return }
 	key := handler.Key
 	if len(key) < 1 {
 		c <- []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: "Events API key is not yet set."}}
@@ -66,6 +67,13 @@ func (handler Handler) Handle(term string, c chan []*bot.OutgoingMessage, messag
 			},
 		}
 		return
+	}
+	if res.TotalItems > 10 {
+		res, err = client.SearchEvents(term, dateString, zip, 25, sort)
+		if err != nil {
+			c <- []*bot.OutgoingMessage{&bot.OutgoingMessage{Err: err}}
+			return
+		}
 	}
 	c <- outputEvents(res.Events)
 	c <- []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: "Test"}}
