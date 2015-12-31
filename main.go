@@ -25,7 +25,7 @@ func main() {
 			"! news",
 		},
 		Handler: new(googlenews.Handler),
-		BotID: os.Getenv("GROUPME_BOT_ID"),
+		BotID:   os.Getenv("GROUPME_BOT_ID"),
 	}
 
 	// Adult Point tracking bot
@@ -41,7 +41,7 @@ func main() {
 			"! adults",
 		},
 		Handler: new(adultpoints.Handler),
-		BotID: os.Getenv("GROUPME_BOT_ID"),
+		BotID:   os.Getenv("GROUPME_BOT_ID"),
 	}
 
 	commands = append(commands, news)

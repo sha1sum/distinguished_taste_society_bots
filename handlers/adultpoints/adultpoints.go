@@ -122,8 +122,8 @@ func requestPoint(words []string, sess *mgo.Session, message bot.IncomingMessage
 		Reason:      args,
 	}
 	col.Update(bson.M{"_id": cu.ID}, bson.M{
-		"$push":bson.M{
-			"requests":req,
+		"$push": bson.M{
+			"requests": req,
 		},
 	})
 	t := message.Name + " has requested an adult point \"" + args + "\"."
@@ -143,7 +143,7 @@ func determineReference(cu user, sess *mgo.Session) string {
 			break
 		}
 	}
-	return strconv.Itoa(ui + 1) + strconv.Itoa(len(cu.Requests) + 1)
+	return strconv.Itoa(ui+1) + strconv.Itoa(len(cu.Requests)+1)
 }
 
 // awardPoint increases the number of approved point requests (as long as it's not a duplicate or an attempt to award
@@ -152,7 +152,7 @@ func awardPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) 
 	args := strings.Join(words, " ")
 	col := sess.DB(DB).C("groupmeUsersV4")
 	var cu user
-	err := col.Find(bson.M{"requests.reference":args}).One(&cu)
+	err := col.Find(bson.M{"requests.reference": args}).One(&cu)
 	if err != nil {
 		return []*bot.OutgoingMessage{&bot.OutgoingMessage{Text: "Couldn't find a request with reference \"" + args + "\"."}}
 	}
@@ -168,9 +168,9 @@ func awardPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) 
 		t := "Stop trying to be slick! You can't approve your own requests!"
 		t += " Just for that, I'm revoking the request!"
 		col.Update(bson.M{"_id": cu.ID}, bson.M{
-			"$pull":bson.M{
-				"requests":bson.M{
-					"reference":args,
+			"$pull": bson.M{
+				"requests": bson.M{
+					"reference": args,
 				},
 			},
 		})
@@ -185,14 +185,14 @@ func awardPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) 
 	}
 	var bcu user
 	err = col.Find(bson.M{
-		"_id":cu.ID,
-		"requests." + strconv.Itoa(ri) + ".rejections.rejectedByID":message.UserID,
+		"_id": cu.ID,
+		"requests." + strconv.Itoa(ri) + ".rejections.rejectedByID": message.UserID,
 	}).One(&bcu)
 	if len(bcu.UserID) > 0 && err == nil {
 		col.Update(bson.M{"_id": cu.ID}, bson.M{
-			"$pull":bson.M{
-				"requests." + strconv.Itoa(ri) + ".rejections":bson.M{
-					"rejectedByID":message.UserID,
+			"$pull": bson.M{
+				"requests." + strconv.Itoa(ri) + ".rejections": bson.M{
+					"rejectedByID": message.UserID,
 				},
 			},
 		})
@@ -211,8 +211,8 @@ func awardPoint(words []string, sess *mgo.Session, message bot.IncomingMessage) 
 func addApproval(col *mgo.Collection, approvedByID string, cu *user, ri int) {
 	app := approval{ApprovedByID: approvedByID, ApprovedOn: time.Now()}
 	col.Update(bson.M{"_id": cu.ID}, bson.M{
-		"$push":bson.M{
-			"requests." + strconv.Itoa(ri) + ".approvals":app,
+		"$push": bson.M{
+			"requests." + strconv.Itoa(ri) + ".approvals": app,
 		},
 	})
 	calcPoints(col, cu)
@@ -251,15 +251,15 @@ func rejectPoint(words []string, sess *mgo.Session, message bot.IncomingMessage)
 	}
 	var bcu user
 	err = col.Find(bson.M{
-		"_id":cu.ID,
-		"requests." + strconv.Itoa(ri) + ".approvals.approvedByID":message.UserID,
+		"_id": cu.ID,
+		"requests." + strconv.Itoa(ri) + ".approvals.approvedByID": message.UserID,
 	}).One(&bcu)
 	fmt.Printf("bcu: %+v\n\n", bcu)
 	if len(bcu.UserID) > 0 && err == nil {
 		col.Update(bson.M{"_id": cu.ID}, bson.M{
-			"$pull":bson.M{
-				"requests." + strconv.Itoa(ri) + ".approvals":bson.M{
-					"approvedByID":message.UserID,
+			"$pull": bson.M{
+				"requests." + strconv.Itoa(ri) + ".approvals": bson.M{
+					"approvedByID": message.UserID,
 				},
 			},
 		})
@@ -278,8 +278,8 @@ func rejectPoint(words []string, sess *mgo.Session, message bot.IncomingMessage)
 func addRejection(col *mgo.Collection, rejectedByID string, cu *user, ri int) {
 	rej := rejection{RejectedByID: rejectedByID, RejectedOn: time.Now()}
 	col.Update(bson.M{"_id": cu.ID}, bson.M{
-		"$push":bson.M{
-			"requests." + strconv.Itoa(ri) + ".rejections":rej,
+		"$push": bson.M{
+			"requests." + strconv.Itoa(ri) + ".rejections": rej,
 		},
 	})
 	calcPoints(col, cu)
@@ -288,19 +288,21 @@ func addRejection(col *mgo.Collection, rejectedByID string, cu *user, ri int) {
 // calcPoints calculates the points for a user and updates the point count
 func calcPoints(col *mgo.Collection, cu *user) {
 	points := 0
-	col.Find(bson.M{"_id":cu.ID}).One(cu)
+	col.Find(bson.M{"_id": cu.ID}).One(cu)
 	for _, req := range cu.Requests {
-		if len(req.Approvals) <= len(req.Rejections) { continue }
+		if len(req.Approvals) <= len(req.Rejections) {
+			continue
+		}
 		points++
 	}
-	col.Update(bson.M{"_id":cu.ID}, bson.M{"$set": bson.M{"points":points}})
-	col.Find(bson.M{"userID":cu.UserID}).One(cu)
+	col.Update(bson.M{"_id": cu.ID}, bson.M{"$set": bson.M{"points": points}})
+	col.Find(bson.M{"userID": cu.UserID}).One(cu)
 }
 
 // announcePointChange sends a message to the group about the current state of the awards/rejects for the point request
 // depending on the balance of awards/rejections
 func announcePointChange(approving bool, col *mgo.Collection, cu *user, ri int, previous [2]int, message bot.IncomingMessage) *bot.OutgoingMessage {
-	col.Find(bson.M{"userID":cu.UserID}).One(cu)
+	col.Find(bson.M{"userID": cu.UserID}).One(cu)
 	pa := previous[0]
 	pr := previous[1]
 	req := cu.Requests[ri]
