@@ -1,0 +1,15 @@
+{
+	"ImportPath": "github.com/sha1sum/distinguished_taste_society_bots",
+	"GoVersion": "go1.5.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/sha1sum/golang_groupme_bot/bot",
+			"Rev": "62a6b7bd245e5ae6dbff45b5f2e99f177bffef6c"
+		},
+		{
+			"ImportPath": "gopkg.in/mgo.v2",
+			"Comment": "r2015.10.05-1-g4d04138",
+			"Rev": "4d04138ffef2791c479c0c8bbffc30b34081b8d9"
+		}
+	]
+}
