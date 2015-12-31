@@ -318,6 +318,8 @@ func announcePointChange(approving bool, col *mgo.Collection, cu *user, ri int, 
 		return &bot.OutgoingMessage{Text: message.Name + " thinks you should try harder, " + cu.Name + "! Your point just got revoked \"" + req.Reason + "\". :("}
 	case pr > pa && len(req.Rejections) == len(req.Approvals):
 		return &bot.OutgoingMessage{Text: "So close to gettin' that point, " + cu.Name + "! You just need one more approval \"" + req.Reason + "\"."}
+	case len(req.Approvals) > len(req.Rejections) && len(req.Rejections) > pr:
+		return &bot.OutgoingMessage{Text: "Never mind that hater " + message.Name + ", " + cu.Name + ", you've still got more approvals than rejections \"" + req.Reason + "\"!"}
 	case len(req.Approvals) > len(req.Rejections):
 		return &bot.OutgoingMessage{Text: cu.Name + " is stackin' up approvals \"" + req.Reason + "\"!"}
 	case len(req.Rejections) > len(req.Approvals) && len(req.Approvals) > pa:
