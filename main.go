@@ -51,8 +51,8 @@ func main() {
 			"!events",
 			"! events",
 		},
-		Handler: events.Handler{Key:os.Getenv("EVENTFUL_API_KEY"), ZIP:"33701"},
-		BotID: os.Getenv("GROUPME_BOT_ID"),
+		Handler: events.Handler{Key: os.Getenv("EVENTFUL_API_KEY"), ZIP: "33701"},
+		BotID:   os.Getenv("GROUPME_BOT_ID"),
 	}
 
 	commands = append(commands, news)
