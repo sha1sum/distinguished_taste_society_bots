@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/sha1sum/distinguished_taste_society_bots/handlers/adultpoints"
+	"github.com/sha1sum/distinguished_taste_society_bots/handlers/events"
 	"github.com/sha1sum/distinguished_taste_society_bots/handlers/googlenews"
 	"github.com/sha1sum/golang_groupme_bot/bot"
 )
@@ -44,8 +45,19 @@ func main() {
 		BotID:   os.Getenv("GROUPME_BOT_ID"),
 	}
 
+	// Event Search bot
+	events := bot.Command{
+		Triggers: []string{
+			"!events",
+			"! events",
+		},
+		Handler: events.Handler{Key:os.Getenv("EVENTFUL_API_KEY"), ZIP:"33701"},
+		BotID: os.Getenv("GROUPME_BOT_ID"),
+	}
+
 	commands = append(commands, news)
 	commands = append(commands, adult)
+	commands = append(commands, events)
 
 	bot.Listen(commands)
 }
