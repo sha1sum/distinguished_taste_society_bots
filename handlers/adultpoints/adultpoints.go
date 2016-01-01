@@ -62,7 +62,9 @@ var DB string
 // Handle is a satisfaction of the bot.Handler interface that's used to process IncomingMessages and output
 // OutgoingMessages
 func (handler Handler) Handle(term string, c chan []*bot.OutgoingMessage, message bot.IncomingMessage) {
-	if message.SenderType == "bot" { return }
+	if message.SenderType == "bot" {
+		return
+	}
 	uri := os.Getenv("MONGOLAB_URI")
 	if uri == "" {
 		fmt.Println("no connection string provided")

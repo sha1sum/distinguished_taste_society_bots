@@ -46,18 +46,21 @@ func main() {
 	}
 
 	// Event Search bot
-	events := bot.Command{
+	eventsHandler := events.Handler{Key: os.Getenv("EVENTFUL_API_KEY"), ZIP: "33701"}
+	eventBot := bot.Command{
 		Triggers: []string{
 			"!events",
 			"! events",
 		},
-		Handler: events.Handler{Key: os.Getenv("EVENTFUL_API_KEY"), ZIP: "33701"},
+		Handler: eventsHandler,
 		BotID:   os.Getenv("GROUPME_BOT_ID"),
 	}
 
 	commands = append(commands, news)
 	commands = append(commands, adult)
-	commands = append(commands, events)
+	commands = append(commands, eventBot)
+
+	eventsHandler.SetupSearch(eventBot.BotID)
 
 	bot.Listen(commands)
 }

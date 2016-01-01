@@ -54,7 +54,7 @@ type Event struct {
 	Longitude   string     `json:"longitude""`
 	CityName    string     `json:"city_name""`
 	Description string     `json:"description""`
-	Created string `json:"created"`
+	Created     string     `json:"created"`
 	Image       *ImageInfo `json:"image""`
 }
 
