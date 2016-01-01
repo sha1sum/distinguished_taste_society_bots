@@ -75,16 +75,35 @@ func New(apikey string) *Client {
 	return &Client{APIKey: apikey}
 }
 
-func (client *Client) SearchEvents(srch string, date string, location string, within int, sort string) (*SearchEventsResponse, error) {
+func (client *Client) SearchEvents(
+	srch string,
+	date string,
+	location string,
+	within int,
+	sort string,
+	perPage int,
+	page int,
+) (*SearchEventsResponse, error) {
 	var clean SearchEventsResponse
 	var data RawSearchEventsResponse
 
 	if len(date) < 1 {
-		date = "&date=" + date
-	} else {
 		date = ""
+	} else {
+		date = "&date=" + date
 	}
-	url := fmt.Sprintf("http://api.eventful.com/json/events/search?app_key=%s%s&keywords=%s&location=%s&within=%s&sort_order=%s", url.QueryEscape(client.APIKey), url.QueryEscape(date), url.QueryEscape(srch), url.QueryEscape(location), strconv.Itoa(within), sort)
+	url := fmt.Sprintf(
+		"http://api.eventful.com/json/events/search?"+
+			"app_key=%s%s&keywords=%s&location=%s&within=%s&sort_order=%s&page_size=%s&page_number=%s",
+		url.QueryEscape(client.APIKey),
+		date,
+		url.QueryEscape(srch),
+		url.QueryEscape(location),
+		strconv.Itoa(within),
+		sort,
+		strconv.Itoa(perPage),
+		strconv.Itoa(page),
+	)
 	println(url)
 	resp, err := http.Get(url)
 
@@ -111,4 +130,32 @@ func (client *Client) SearchEvents(srch string, date string, location string, wi
 	clean.Events = data.Events.Events
 
 	return &clean, nil
+}
+
+func (client Client) SearchAllEvents(
+	srch string,
+	date string,
+	location string,
+	within int,
+	sort string,
+	maxPages int,
+) ([]Event, error) {
+	var events []Event
+	first, err := client.SearchEvents(srch, date, location, within, "date", 100, 1)
+	if err != nil {
+		return events, err
+	}
+	events = append(events, first.Events...)
+	pages := first.PageCount
+	if pages > maxPages {
+		pages = maxPages
+	}
+	for i := 2; i <= pages; i++ {
+		page, err := client.SearchEvents(srch, date, location, within, "date", 100, i)
+		if err != nil {
+			return events, err
+		}
+		events = append(events, page.Events...)
+	}
+	return events, nil
 }

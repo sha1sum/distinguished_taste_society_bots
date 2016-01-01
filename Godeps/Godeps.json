@@ -4,7 +4,7 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/sha1sum/eventful",
-			"Rev": "45f1161a7cf0ce5b227c4a44a2a0961c87c290fc"
+			"Rev": "9416978751506a21d3394c4606c58f884e3bc264"
 		},
 		{
 			"ImportPath": "github.com/sha1sum/golang_groupme_bot/bot",
