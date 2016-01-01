@@ -89,6 +89,7 @@ func (handler Handler) Handle(term string, c chan []*bot.OutgoingMessage, messag
 			&bot.OutgoingMessage{
 				Text: "No events found for \"" + term + "\" in the next " + strconv.Itoa(days) + "days.",
 			},
+			handler.trackEvent(term, message),
 		}
 		return
 	}
