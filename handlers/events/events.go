@@ -142,7 +142,8 @@ func (handler Handler) trackEvent(term string, message bot.IncomingMessage) *bot
 	var td eventSearch
 	col.Find(bson.M{"term": strings.ToLower(term)}).One(&td)
 	if len(td.Term) < 1 {
-		col.Insert(eventSearch{Term: strings.ToLower(term), LatestCreated: time.Date(1970, 1, 1, 0, 0, 0, 0, time.LoadLocation("America/New_York")), Users: []user{u}})
+		loc, _ := time.LoadLocation("America/New_York")
+		col.Insert(eventSearch{Term: strings.ToLower(term), LatestCreated: time.Date(1970, 1, 1, 0, 0, 0, 0, loc), Users: []user{u}})
 	} else {
 		col.Update(bson.M{"term": strings.ToLower(term)}, bson.M{"$addToSet": bson.M{"users": u}})
 	}
